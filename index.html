@@ -54,18 +54,21 @@
     box-shadow: var(--shadow); margin-bottom: 16px;
   }
   .row { position: relative; }
-  .row + .row { margin-top: 10px; }
+  .swap-wrap + .row { margin-top: 10px; }
   .row label { display:block; font-size:.78rem; color: var(--muted); margin-bottom:6px; }
   .field {
     display: flex; align-items: center; gap: 10px;
     border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px;
     background: var(--bg);
   }
-  .field select {
+  .field .cur-btn {
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
     border: none; background: transparent; color: var(--text);
     font-size: 1rem; font-weight: 600; cursor: pointer; outline: none;
-    padding: 4px; min-width: 116px;
+    padding: 4px; white-space: nowrap;
   }
+  .field .cur-btn .flag { font-size: 1.1rem; }
+  .field .cur-btn .caret { font-size: .65rem; color: var(--muted); }
   .field input {
     flex: 1; border: none; background: transparent; color: var(--text);
     font-size: 1.5rem; font-weight: 700; text-align: right; outline: none;
@@ -83,6 +86,48 @@
     margin-top: 4px; line-height: 1.5;
   }
   .meta b { color: var(--accent); }
+  /* currency picker modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(10,14,24,.45);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 100;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  @media (min-width: 520px) {
+    .modal-backdrop { align-items: center; }
+  }
+  .modal-panel {
+    background: var(--card); width: 100%; max-width: 460px;
+    border-radius: 20px 20px 0 0; max-height: 78vh;
+    display: flex; flex-direction: column; box-shadow: var(--shadow); overflow: hidden;
+  }
+  @media (min-width: 520px) {
+    .modal-panel { border-radius: 20px; max-height: 70vh; margin: 0 14px; }
+  }
+  .modal-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 14px 10px; border-bottom: 1px solid var(--line);
+  }
+  .modal-head input {
+    flex: 1; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    border-radius: 12px; padding: 10px 12px; font-size: 1rem; outline: none;
+  }
+  .modal-close {
+    border: none; background: var(--key); color: var(--key-text);
+    width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+    font-size: .95rem; flex-shrink: 0;
+  }
+  .modal-list { overflow-y: auto; padding: 6px 8px 14px; }
+  .cur-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 10px 10px; border: none; background: transparent; color: var(--text);
+    border-radius: 12px; cursor: pointer; font-size: .95rem; text-align: left;
+  }
+  .cur-item:hover, .cur-item.active { background: var(--accent-soft); }
+  .cur-item .flag { font-size: 1.2rem; }
+  .cur-item .code { font-weight: 700; min-width: 44px; }
+  .cur-item .name { color: var(--muted); font-size: .85rem; }
+  .cur-empty { text-align: center; color: var(--muted); font-size: .85rem; padding: 20px 0; }
   /* calculator */
   .calc-title {
     font-size: .82rem; color: var(--muted); margin-bottom: 10px;
@@ -126,7 +171,7 @@
     <div class="row">
       <label>從</label>
       <div class="field">
-        <select id="fromCur"></select>
+        <button type="button" class="cur-btn" id="fromCurBtn"></button>
         <input id="fromAmt" type="text" inputmode="decimal" value="1000" />
       </div>
     </div>
@@ -136,12 +181,13 @@
     <div class="row">
       <label>換成</label>
       <div class="field">
-        <select id="toCur"></select>
+        <button type="button" class="cur-btn" id="toCurBtn"></button>
         <input id="toAmt" type="text" inputmode="decimal" readonly />
       </div>
     </div>
 
     <div class="meta" id="rateInfo">載入匯率中…</div>
+    <button class="send" id="sendToCalc">↓ 把結果帶入下方計算機</button>
   </div>
 
   <div class="card">
@@ -184,6 +230,16 @@
   <footer>匯率來源：exchangerate-api.com ・ 僅供參考</footer>
 </div>
 
+<div class="modal-backdrop" id="curModal" hidden>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <input type="text" id="curSearch" placeholder="搜尋代碼或幣別名稱…" autocomplete="off" />
+      <button type="button" class="modal-close" id="curModalClose">✕</button>
+    </div>
+    <div class="modal-list" id="curList"></div>
+  </div>
+</div>
+
 <script>
 // ---- 幣別清單（含旗幟與中文名）----
 const CURRENCIES = [
@@ -211,11 +267,36 @@ const store = {
   set: (k,v) => { try { localStorage.setItem(k,v); } catch(e){} }
 };
 
-// ---- 建立幣別下拉 ----
-function fillSelect(sel, selected) {
-  sel.innerHTML = CURRENCIES.map(([c,f,n]) =>
-    `<option value="${c}">${f} ${c} ${n}</option>`).join("");
-  sel.value = selected;
+// ---- 幣別選擇器（可搜尋）----
+const selected = { fromCur: "TWD", toCur: "JPY" };
+let activeField = null;
+
+function renderCurBtn(field) {
+  const [c,f] = CURRENCIES.find(x => x[0] === selected[field]);
+  $(field + "Btn").innerHTML =
+    `<span class="flag">${f}</span><span class="code">${c}</span><span class="caret">▾</span>`;
+}
+function renderCurList() {
+  const q = $("curSearch").value.trim().toLowerCase();
+  const matched = CURRENCIES.filter(([c,f,n]) =>
+    !q || c.toLowerCase().includes(q) || n.toLowerCase().includes(q));
+  $("curList").innerHTML = matched.length
+    ? matched.map(([c,f,n]) => `
+        <button type="button" class="cur-item" data-code="${c}">
+          <span class="flag">${f}</span><span class="code">${c}</span><span class="name">${n}</span>
+        </button>`).join("")
+    : `<div class="cur-empty">找不到符合的幣別</div>`;
+}
+function openCurModal(field) {
+  activeField = field;
+  $("curSearch").value = "";
+  renderCurList();
+  $("curModal").hidden = false;
+  $("curSearch").focus();
+}
+function closeCurModal() {
+  $("curModal").hidden = true;
+  activeField = null;
 }
 
 // ---- 主題 ----
@@ -255,7 +336,7 @@ function fmt(n){
 }
 function convert() {
   if (!rates) return;
-  const from = $("fromCur").value, to = $("toCur").value;
+  const from = selected.fromCur, to = selected.toCur;
   const amt = parseNum($("fromAmt").value);
   const rf = rates[from], rt = rates[to];
   if (!rf || !rt) return;
@@ -310,17 +391,39 @@ $("sendToConv").addEventListener("click", ()=>{
   const v = calcEval(expr);
   if (v && v !== null){ $("fromAmt").value = v.replace(/,/g,""); convert(); }
 });
+$("sendToCalc").addEventListener("click", ()=>{
+  const v = parseNum($("toAmt").value);
+  if (!v) return;
+  expr = String(v);
+  calcRender();
+});
 $("fromAmt").addEventListener("input", convert);
-["fromCur","toCur"].forEach(id=>{
-  $(id).addEventListener("change", ()=>{
-    store.set(id, $(id).value); convert();
-  });
+["fromCur","toCur"].forEach(field=>{
+  $(field + "Btn").addEventListener("click", ()=> openCurModal(field));
+});
+$("curList").addEventListener("click", (e)=>{
+  const item = e.target.closest(".cur-item");
+  if (!item || !activeField) return;
+  selected[activeField] = item.dataset.code;
+  renderCurBtn(activeField);
+  store.set(activeField, selected[activeField]);
+  convert();
+  closeCurModal();
+});
+$("curSearch").addEventListener("input", renderCurList);
+$("curModalClose").addEventListener("click", closeCurModal);
+$("curModal").addEventListener("click", (e)=>{
+  if (e.target === $("curModal")) closeCurModal();
+});
+document.addEventListener("keydown", (e)=>{
+  if (e.key === "Escape" && !$("curModal").hidden) closeCurModal();
 });
 $("swapBtn").addEventListener("click", ()=>{
-  const f = $("fromCur").value, t = $("toCur").value;
-  $("fromCur").value = t; $("toCur").value = f;
+  const f = selected.fromCur, t = selected.toCur;
+  selected.fromCur = t; selected.toCur = f;
+  renderCurBtn("fromCur"); renderCurBtn("toCur");
   $("fromAmt").value = parseNum($("toAmt").value) || $("fromAmt").value;
-  store.set("fromCur", $("fromCur").value); store.set("toCur", $("toCur").value);
+  store.set("fromCur", selected.fromCur); store.set("toCur", selected.toCur);
   convert();
 });
 $("themeBtn").addEventListener("click", ()=>{
@@ -333,8 +436,10 @@ $("themeBtn").addEventListener("click", ()=>{
   const savedTheme = store.get("theme")
     || (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light");
   applyTheme(savedTheme);
-  fillSelect($("fromCur"), store.get("fromCur") || "TWD");
-  fillSelect($("toCur"), store.get("toCur") || "JPY");
+  selected.fromCur = store.get("fromCur") || "TWD";
+  selected.toCur = store.get("toCur") || "JPY";
+  renderCurBtn("fromCur");
+  renderCurBtn("toCur");
   calcRender();
   loadRates();
 })();

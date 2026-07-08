@@ -15,22 +15,6 @@
 
 直接用瀏覽器打開 `index.html` 即可。
 
-## 放上 GitHub Pages
-
-1. 建一個新的 GitHub repo，把 `index.html` 推上去：
-
-   ```bash
-   git init
-   git add index.html README.md
-   git commit -m "幣別轉換小工具"
-   git branch -M main
-   git remote add origin https://github.com/<你的帳號>/<repo名稱>.git
-   git push -u origin main
-   ```
-
-2. 到 repo 的 **Settings → Pages**，Source 選 `Deploy from a branch`，Branch 選 `main` / `root`，儲存。
-3. 稍等一兩分鐘，網址會是 `https://<你的帳號>.github.io/<repo名稱>/`，手機也能直接開。
-
 ## 備註
 
 - 匯率僅供參考，實際交易以銀行／刷卡為準。

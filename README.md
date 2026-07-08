@@ -15,6 +15,36 @@
 
 直接用瀏覽器打開 `index.html` 即可。
 
+## 測試（Playwright）
+
+1. 安裝依賴：
+
+	```bash
+	npm install
+	```
+
+2. 執行 E2E 測試：
+
+	```bash
+	npm run test:e2e
+	```
+
+3. 以有畫面模式執行（方便觀察操作流程）：
+
+	```bash
+	npm run test:e2e:headed
+	```
+
+4. 開啟 Playwright UI 模式：
+
+	```bash
+	npm run test:e2e:ui
+	```
+
+測試執行後的結果會輸出到 `test-results/`。
+
+版本相容提醒：此專案目前使用 `@playwright/test@1.54.1`，需與開發容器的 Playwright image 版本一致（`mcr.microsoft.com/playwright:v1.54.1-jammy`），否則可能出現瀏覽器執行檔不存在的錯誤。
+
 ## 備註
 
 - 匯率僅供參考，實際交易以銀行／刷卡為準。

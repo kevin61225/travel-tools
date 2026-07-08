@@ -1,0 +1,26 @@
+{
+  "name": "travel-tools-devcontainer",
+  "image": "mcr.microsoft.com/playwright:v1.54.1-jammy",
+  "remoteUser": "pwuser",
+  "updateRemoteUserUID": true,
+  "runArgs": [
+    "--init"
+  ],
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "forwardPorts": [
+    3000,
+    4173,
+    8080
+  ],
+  "postCreateCommand": "npm ci || npm install",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "ms-playwright.playwright"
+      ]
+    }
+  }
+}

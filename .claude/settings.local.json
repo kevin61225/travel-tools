@@ -1,8 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(timeout 60 npx --yes playwright@latest --version)",
-      "Bash(node -e ' *)"
-    ]
+    "allow": []
   }
 }
